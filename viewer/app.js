@@ -42,7 +42,6 @@ const elements = {
   metricsTable: document.getElementById("metricsTable"),
   issueList: document.getElementById("issueList"),
   noteList: document.getElementById("noteList"),
-  timelineMarkers: document.getElementById("timelineMarkers"),
 };
 
 const ctx = elements.canvas.getContext("2d");
@@ -366,7 +365,6 @@ function renderAll() {
   renderMetrics(frameData);
   renderIssues();
   renderNotes();
-  renderTimelineMarkers();
   fitCanvas();
 }
 
@@ -493,19 +491,6 @@ function renderIssues() {
     <div>${escapeHtml(issue.message || "")}</div>
   </button>`).join("");
   elements.issueList.querySelectorAll(".issue-item").forEach((node) => {
-    node.addEventListener("click", () => setFrame(Number(node.dataset.step || 0)));
-  });
-}
-
-function renderTimelineMarkers() {
-  if (!state.replay || !elements.timelineMarkers) return;
-  const maxStep = Math.max(1, state.replay.frames.length - 1);
-  const uniqueSteps = [...new Set((state.replay.issues || []).map((issue) => Number(issue.step)).filter((step) => Number.isFinite(step)))];
-  elements.timelineMarkers.innerHTML = uniqueSteps.map((step) => {
-    const left = Math.max(0, Math.min(100, (step / maxStep) * 100));
-    return `<button class="timeline-marker" type="button" data-step="${step}" style="left:${left}%" aria-label="Jump to issue at step ${step}"></button>`;
-  }).join("");
-  elements.timelineMarkers.querySelectorAll(".timeline-marker").forEach((node) => {
     node.addEventListener("click", () => setFrame(Number(node.dataset.step || 0)));
   });
 }

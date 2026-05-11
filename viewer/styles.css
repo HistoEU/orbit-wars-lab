@@ -191,26 +191,6 @@ button:active,
   min-width: 0;
 }
 
-.timeline-markers {
-  position: absolute;
-  inset: -4px 8px auto 8px;
-  height: 14px;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.timeline-marker {
-  position: absolute;
-  top: 0;
-  width: 3px;
-  height: 14px;
-  border-radius: 999px;
-  background: var(--light-red);
-  box-shadow: 0 0 12px rgba(255, 111, 126, 0.9);
-  pointer-events: auto;
-  transform: translateX(-50%);
-}
-
 .timeline select {
   min-height: 38px;
   padding: 0 10px;
