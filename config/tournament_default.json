@@ -1,0 +1,13 @@
+{
+  "label": "starter_vs_hold_smoke",
+  "seeds": [1, 2, 3, 4, 5],
+  "workers": 2,
+  "matchups": [
+    {
+      "name": "starter_vs_hold",
+      "agents": ["bots/starter/main.py", "bots/random_hold/main.py"],
+      "player_count": 2,
+      "rotate_slots": true
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+.venv/
+.venv-*/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Kaggle credentials and local secrets
+.kaggle/
+kaggle.json
+access_token
+*.env
+.env
+
+# Large/generated artifacts
+runs/*
+!runs/.gitkeep
+submissions/*
+!submissions/.gitkeep
+bots/generated/
+*.zip
+*.tar.gz
+*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
