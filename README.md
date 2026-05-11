@@ -29,6 +29,12 @@ Export a replay for the visual viewer:
 .venv-ow\Scripts\python tools\run_tournament.py --config config\tournament_default.json
 ```
 
+Run a tournament that also exports viewer replays under `runs\<run_id>\replays\`:
+
+```powershell
+.venv-ow\Scripts\python tools\run_tournament.py --config config\tournament_viewer_smoke.json
+```
+
 Analyze a run directory:
 
 ```powershell

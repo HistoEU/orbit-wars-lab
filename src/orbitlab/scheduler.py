@@ -9,6 +9,7 @@ from typing import Any
 from .detectors import detect_match_issues
 from .issues import Issue
 from .reporting import write_summary
+from .replay import merge_replay_issues
 from .storage import init_db, insert_issue, insert_match, insert_run, insert_turn_metric, read_matches, write_csv
 from .tournament import run_match
 
@@ -76,6 +77,10 @@ def run_tournament_from_config(config: dict[str, Any], out_dir: str | Path | Non
     insert_run(db_path, run_id, created_at, label, config)
 
     jobs = _scheduled_matches(config, run_id)
+    if bool(config.get("export_viewer_replays", False)):
+        replay_dir = run_dir / "replays"
+        for job in jobs:
+            job["viewer_replay_path"] = str(replay_dir / f"{job['match_id']}.viewer.json")
     workers = max(1, int(config.get("workers", 1)))
     if workers == 1:
         results = [_run_job(job) for job in jobs]
@@ -95,10 +100,13 @@ def run_tournament_from_config(config: dict[str, Any], out_dir: str | Path | Non
         for metric in metrics:
             insert_turn_metric(db_path, metric)
         all_metrics.extend(metrics)
-        for index, issue in enumerate(detect_match_issues(result)):
+        result_issues = detect_match_issues(result)
+        for index, issue in enumerate(result_issues):
             row = _issue_to_row(issue, index)
             insert_issue(db_path, row)
             all_issues.append(row)
+        if result.get("replay_path"):
+            merge_replay_issues(result["replay_path"], result_issues)
 
     matches = read_matches(db_path)
     write_csv(run_dir / "matches.csv", matches)

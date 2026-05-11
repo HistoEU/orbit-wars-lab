@@ -132,3 +132,11 @@ def write_viewer_replay(
     replay = build_viewer_replay(match, env, issues=issues, notes=notes)
     out_path.write_text(json.dumps(replay, indent=2), encoding="utf-8")
     return out_path
+
+
+def merge_replay_issues(path: str | Path, issues: list[Any]) -> Path:
+    replay_path = Path(path)
+    payload = json.loads(replay_path.read_text(encoding="utf-8"))
+    payload["issues"] = [_issue_row(issue) for issue in issues]
+    replay_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return replay_path

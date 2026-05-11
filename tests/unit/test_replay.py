@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from src.orbitlab.issues import Issue
-from src.orbitlab.replay import build_viewer_replay, write_viewer_replay
+from src.orbitlab.replay import build_viewer_replay, merge_replay_issues, write_viewer_replay
 
 
 def _fake_state(observation: dict, action=None):
@@ -71,3 +71,15 @@ def test_write_viewer_replay_creates_json_file(tmp_path: Path):
 
     assert out_path.exists()
     assert json.loads(out_path.read_text(encoding="utf-8"))["match_id"] == "m1"
+
+
+def test_merge_replay_issues_updates_existing_replay(tmp_path: Path):
+    env = SimpleNamespace(steps=[[_fake_state({"planets": [], "fleets": [], "comets": [], "comet_planet_ids": []})]])
+    match = {"match_id": "m1", "seed": 1, "player_count": 2, "agents": ["a", "b"]}
+    out_path = write_viewer_replay(tmp_path / "viewer.json", match, env)
+
+    merge_replay_issues(out_path, [Issue("crash", "P0", "Slot died", "m1", step=2, slot=1)])
+
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["issues"][0]["detector"] == "crash"
+    assert payload["issues"][0]["slot"] == 1
