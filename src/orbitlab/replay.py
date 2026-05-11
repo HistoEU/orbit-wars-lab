@@ -7,6 +7,7 @@ from typing import Any
 
 from .adapters import read_field
 from .physics import BOARD_SIZE, CENTER, SUN_RADIUS
+from .replay_analysis import analyze_replay_payload, build_replay_analysis_summary
 
 
 def _jsonable(value: Any) -> Any:
@@ -70,6 +71,30 @@ def _issue_row(issue: Any) -> dict[str, Any]:
     }
 
 
+def _frame_derived(metrics: list[dict[str, Any]]) -> dict[str, Any]:
+    if not metrics:
+        return {
+            "leader_slot": None,
+            "ship_spread": 0.0,
+            "production_leader_slot": None,
+            "planet_leader_slot": None,
+            "pressure_leader_slot": None,
+        }
+    totals = [(int(row["slot"]), float(row.get("total_ships", 0.0))) for row in metrics]
+    productions = [(int(row["slot"]), float(row.get("production", 0.0))) for row in metrics]
+    planets = [(int(row["slot"]), float(row.get("planets", 0.0))) for row in metrics]
+    pressure = [(int(row["slot"]), float(row.get("ships_in_fleets", 0.0))) for row in metrics]
+    leader_slot, leader_ships = max(totals, key=lambda item: item[1])
+    _, min_ships = min(totals, key=lambda item: item[1])
+    return {
+        "leader_slot": leader_slot,
+        "ship_spread": leader_ships - min_ships,
+        "production_leader_slot": max(productions, key=lambda item: item[1])[0],
+        "planet_leader_slot": max(planets, key=lambda item: item[1])[0],
+        "pressure_leader_slot": max(pressure, key=lambda item: item[1])[0],
+    }
+
+
 def build_viewer_replay(
     match: dict[str, Any],
     env: Any,
@@ -89,6 +114,7 @@ def build_viewer_replay(
         planets = _jsonable(read_field(obs, "planets", []) or [])
         fleets = _jsonable(read_field(obs, "fleets", []) or [])
         actions = [_state_action(state) for state in step_states]
+        metrics = _frame_metrics(match_id, step_index, planets, fleets, player_count)
         frames.append(
             {
                 "step": step_index,
@@ -96,12 +122,13 @@ def build_viewer_replay(
                 "fleets": fleets,
                 "comets": _jsonable(read_field(obs, "comets", []) or []),
                 "comet_planet_ids": _jsonable(read_field(obs, "comet_planet_ids", []) or []),
-                "metrics": _frame_metrics(match_id, step_index, planets, fleets, player_count),
+                "metrics": metrics,
+                "derived": _frame_derived(metrics),
                 "actions": actions,
             }
         )
 
-    return {
+    payload = {
         "schema_version": 1,
         "game": "orbit_wars",
         "match_id": match_id,
@@ -118,6 +145,10 @@ def build_viewer_replay(
         "issues": [_issue_row(issue) for issue in (issues or [])],
         "notes": _jsonable(notes or []),
     }
+    combined_issues = list(issues or []) + analyze_replay_payload(payload)
+    payload["issues"] = [_issue_row(issue) for issue in combined_issues]
+    payload["analysis"] = build_replay_analysis_summary(payload, combined_issues)
+    return payload
 
 
 def write_viewer_replay(
@@ -137,6 +168,12 @@ def write_viewer_replay(
 def merge_replay_issues(path: str | Path, issues: list[Any]) -> Path:
     replay_path = Path(path)
     payload = json.loads(replay_path.read_text(encoding="utf-8"))
-    payload["issues"] = [_issue_row(issue) for issue in issues]
+    existing = payload.get("issues", [])
+    payload["issues"] = existing + [_issue_row(issue) for issue in issues]
+    payload["analysis"] = build_replay_analysis_summary(payload, [*_issues_from_rows(existing), *issues])
     replay_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return replay_path
+
+
+def _issues_from_rows(rows: list[dict[str, Any]]) -> list[Any]:
+    return rows

@@ -41,6 +41,12 @@ Analyze a run directory:
 .venv-ow\Scripts\python tools\analyze_run.py runs\<run_id> --focus-agent bots/our_v1/main.py
 ```
 
+Run a direct candidate-vs-baseline comparison with optional replay export:
+
+```powershell
+.venv-ow\Scripts\python tools\compare_bots.py --candidate bots/our_v1/main.py --baseline bots/starter/main.py --seeds 1 2 3 4 5 --viewer-replays
+```
+
 ## Visual Viewer
 
 Start a local static server from the repo root:
@@ -62,3 +68,5 @@ The viewer renders the board, sun danger zone, planets, fleets, timeline, player
 The month-long simulator plan is in `docs/superpowers/plans/2026-05-11-orbit-wars-simulator-lab.md`.
 
 The visual simulator layer plan is in `docs/superpowers/plans/2026-05-11-orbit-wars-visual-simulator-layer.md`.
+
+The high-end analytics roadmap is in `docs/superpowers/plans/2026-05-11-orbit-wars-high-end-sim-analytics-system.md`.

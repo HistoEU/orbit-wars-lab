@@ -180,7 +180,35 @@ button:active,
 }
 
 .timeline input[type="range"] {
+  position: relative;
+  z-index: 2;
+  width: 100%;
   accent-color: var(--cherry);
+}
+
+.slider-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.timeline-markers {
+  position: absolute;
+  inset: -4px 8px auto 8px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.timeline-marker {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--light-red);
+  box-shadow: 0 0 12px rgba(255, 111, 126, 0.9);
+  pointer-events: auto;
+  transform: translateX(-50%);
 }
 
 .timeline select {
@@ -246,6 +274,64 @@ button:active,
 .metrics-table {
   display: grid;
   gap: 8px;
+  overflow-x: auto;
+}
+
+.compare-panel,
+.insight-panel,
+.flaw-signal-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.compare-row,
+.insight-card,
+.flaw-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px;
+  text-align: left;
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.compare-row strong,
+.insight-card strong,
+.flaw-card strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-row span,
+.insight-card span,
+.flaw-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.delta-positive {
+  color: #ffffff;
+}
+
+.delta-negative {
+  color: var(--light-red);
+}
+
+.flaw-card {
+  border-left: 3px solid var(--cherry);
+}
+
+.flaw-card.p1,
+.flaw-card.p0 {
+  background: rgba(225, 6, 44, 0.14);
 }
 
 .metric-row {
@@ -253,11 +339,17 @@ button:active,
   grid-template-columns: minmax(130px, 1.7fr) repeat(5, minmax(42px, 0.7fr));
   gap: 6px;
   align-items: center;
+  min-width: 390px;
   padding: 9px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
   font-size: 13px;
+}
+
+.metric-row strong,
+.metric-value {
+  white-space: nowrap;
 }
 
 .metric-name {
@@ -300,6 +392,7 @@ button:active,
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.045);
   padding: 9px 10px;
+  text-align: left;
 }
 
 .issue-item strong,

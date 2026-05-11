@@ -73,6 +73,32 @@ def test_write_viewer_replay_creates_json_file(tmp_path: Path):
     assert json.loads(out_path.read_text(encoding="utf-8"))["match_id"] == "m1"
 
 
+def test_build_viewer_replay_adds_automatic_analysis_issues():
+    env = SimpleNamespace(
+        steps=[
+            [
+                _fake_state(
+                    {
+                        "planets": [[0, 0, 25.0, 50.0, 2.0, 30.0, 3]],
+                        "fleets": [],
+                        "comets": [],
+                        "comet_planet_ids": [],
+                    },
+                    action=[[0, 0.0, 10]],
+                ),
+                _fake_state({"planets": [[0, 0, 25.0, 50.0, 2.0, 30.0, 3]], "fleets": []}, action=[]),
+            ]
+        ]
+    )
+    match = {"match_id": "m1", "seed": 1, "player_count": 2, "agents": ["a", "b"]}
+
+    replay = build_viewer_replay(match, env)
+
+    assert replay["analysis"]["detector_counts"]["bad_launch_sun_lane"] == 1
+    assert any(issue["detector"] == "bad_launch_sun_lane" for issue in replay["issues"])
+    assert replay["frames"][0]["derived"]["leader_slot"] == 0
+
+
 def test_merge_replay_issues_updates_existing_replay(tmp_path: Path):
     env = SimpleNamespace(steps=[[_fake_state({"planets": [], "fleets": [], "comets": [], "comet_planet_ids": []})]])
     match = {"match_id": "m1", "seed": 1, "player_count": 2, "agents": ["a", "b"]}

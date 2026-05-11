@@ -46,7 +46,10 @@
             <button id="prevButton" type="button">Prev</button>
             <button id="playButton" type="button">Play</button>
             <button id="nextButton" type="button">Next</button>
-            <input id="stepSlider" type="range" min="0" max="0" value="0">
+            <div class="slider-shell">
+              <div id="timelineMarkers" class="timeline-markers"></div>
+              <input id="stepSlider" type="range" min="0" max="0" value="0">
+            </div>
             <select id="speedSelect" aria-label="Playback speed">
               <option value="160">0.5x</option>
               <option value="90" selected>1x</option>
@@ -60,6 +63,21 @@
           <section class="panel-section">
             <h2>Match</h2>
             <dl id="matchSummary" class="summary-list"></dl>
+          </section>
+
+          <section class="panel-section">
+            <h2>Bot Compare</h2>
+            <div id="comparePanel" class="compare-panel"></div>
+          </section>
+
+          <section class="panel-section">
+            <h2>Current Read</h2>
+            <div id="insightPanel" class="insight-panel"></div>
+          </section>
+
+          <section class="panel-section">
+            <h2>Flaw Signals</h2>
+            <div id="flawSignalPanel" class="flaw-signal-panel"></div>
           </section>
 
           <section class="panel-section">

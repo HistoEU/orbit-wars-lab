@@ -1,5 +1,18 @@
 const ownerColors = ["#ff243f", "#f7f7f7", "#ff9aa5", "#8b0018"];
 const neutralColor = "#d8d6d2";
+const detectorLabels = {
+  bad_launch_sun_lane: "Bad launch lane",
+  sun_death: "Fleet crossed sun",
+  missed_comet_window: "Missed comet window",
+  slow_expansion: "Slow expansion",
+  idle_overstock: "Idle overstock",
+  fleet_disappeared_without_capture: "Fleet vanished without gain",
+  late_trailing_no_pressure: "Late no pressure",
+  overdefended_low_production: "Overdefended low value",
+  crash: "Agent crash",
+  slow_match: "Slow match",
+  slot_bias: "Slot bias",
+};
 
 const elements = {
   canvas: document.getElementById("boardCanvas"),
@@ -23,9 +36,13 @@ const elements = {
   winnerReadout: document.getElementById("winnerReadout"),
   matchSubtitle: document.getElementById("matchSubtitle"),
   matchSummary: document.getElementById("matchSummary"),
+  comparePanel: document.getElementById("comparePanel"),
+  insightPanel: document.getElementById("insightPanel"),
+  flawSignalPanel: document.getElementById("flawSignalPanel"),
   metricsTable: document.getElementById("metricsTable"),
   issueList: document.getElementById("issueList"),
   noteList: document.getElementById("noteList"),
+  timelineMarkers: document.getElementById("timelineMarkers"),
 };
 
 const ctx = elements.canvas.getContext("2d");
@@ -343,9 +360,13 @@ function renderAll() {
   elements.winnerReadout.textContent = replay.winner_slot === null || replay.winner_slot === undefined ? "-" : ownerName(replay.winner_slot);
   elements.stepSlider.value = state.frameIndex;
   renderSummary(replay);
+  renderComparePanel(frameData);
+  renderInsightPanel(frameData);
+  renderFlawSignals();
   renderMetrics(frameData);
   renderIssues();
   renderNotes();
+  renderTimelineMarkers();
   fitCanvas();
 }
 
@@ -358,6 +379,64 @@ function renderSummary(replay) {
     ["Reward", replay.rewards.join(" / ")],
   ];
   elements.matchSummary.innerHTML = rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(String(value ?? "-"))}</dd>`).join("");
+}
+
+function buildFrameComparison(frameData) {
+  const metrics = frameData.metrics || [];
+  if (!metrics.length) return [];
+  const bestShips = Math.max(...metrics.map((metric) => Number(metric.total_ships || 0)));
+  return metrics.map((metric) => ({
+    slot: metric.slot,
+    shipDelta: Number(metric.total_ships || 0) - bestShips,
+    production: Number(metric.production || 0),
+    planets: Number(metric.planets || 0),
+    fleets: Number(metric.fleets || 0),
+    pressure: Number(metric.ships_in_fleets || 0),
+  }));
+}
+
+function renderComparePanel(frameData) {
+  const rows = buildFrameComparison(frameData);
+  if (!rows.length) {
+    elements.comparePanel.innerHTML = `<div class="compare-row"><strong>No compare data</strong><span>-</span></div>`;
+    return;
+  }
+  elements.comparePanel.innerHTML = rows.map((row) => {
+    const deltaClass = row.shipDelta >= 0 ? "delta-positive" : "delta-negative";
+    const deltaText = row.shipDelta === 0 ? "leader" : `${row.shipDelta.toFixed(0)} ships`;
+    return `<div class="compare-row">
+      <div><strong>${escapeHtml(ownerName(row.slot))}</strong><span>${row.planets} planets | ${row.production} prod | ${row.pressure.toFixed(0)} transit</span></div>
+      <strong class="${deltaClass}">${escapeHtml(deltaText)}</strong>
+    </div>`;
+  }).join("");
+}
+
+function metricLeader(frameData, key) {
+  const metrics = frameData.metrics || [];
+  if (!metrics.length) return null;
+  return metrics.reduce((best, metric) => Number(metric[key] || 0) > Number(best[key] || 0) ? metric : best, metrics[0]);
+}
+
+function renderInsightPanel(frameData) {
+  const derived = frameData.derived || {};
+  const leader = derived.leader_slot ?? metricLeader(frameData, "total_ships")?.slot;
+  const prodLeader = derived.production_leader_slot ?? metricLeader(frameData, "production")?.slot;
+  const planetLeader = derived.planet_leader_slot ?? metricLeader(frameData, "planets")?.slot;
+  const pressureLeader = derived.pressure_leader_slot ?? metricLeader(frameData, "ships_in_fleets")?.slot;
+  const shipSpread = Number(derived.ship_spread ?? 0);
+  const severityCounts = state.replay?.analysis?.severity_counts || {};
+  const totalIssues = Number(state.replay?.analysis?.total_issues || 0);
+  const cards = [
+    ["Leader", ownerName(Number(leader)), `${shipSpread.toFixed(0)} ship spread`],
+    ["Production edge", ownerName(Number(prodLeader)), "best current income"],
+    ["Map control", ownerName(Number(planetLeader)), "most owned planets"],
+    ["Pressure", ownerName(Number(pressureLeader)), "most ships in transit"],
+    ["Auto flags", `${totalIssues}`, `P1 ${severityCounts.P1 || 0} | P2 ${severityCounts.P2 || 0} | P3 ${severityCounts.P3 || 0}`],
+  ];
+  elements.insightPanel.innerHTML = cards.map(([title, value, meta]) => `<div class="insight-card">
+    <strong>${escapeHtml(title)}: ${escapeHtml(value)}</strong>
+    <span>${escapeHtml(meta)}</span>
+  </div>`).join("");
 }
 
 function renderMetrics(frameData) {
@@ -376,11 +455,30 @@ function renderMetrics(frameData) {
   elements.metricsTable.innerHTML = headers + rows;
 }
 
+function detectorLabel(detector) {
+  return detectorLabels[detector] || detector || "Issue";
+}
+
 function nearbyIssues() {
   if (!state.replay) return [];
   const frameData = currentFrame();
   if (!frameData) return [];
   return (state.replay.issues || []).filter((issue) => issue.step === null || issue.step === undefined || Math.abs(Number(issue.step) - Number(frameData.step)) <= 8);
+}
+
+function renderFlawSignals() {
+  const issues = nearbyIssues();
+  if (!issues.length) {
+    elements.flawSignalPanel.innerHTML = `<div class="flaw-card"><strong>Clean nearby window</strong><span>No automatic flaw flags within 8 turns.</span></div>`;
+    return;
+  }
+  elements.flawSignalPanel.innerHTML = issues.slice(0, 4).map((issue) => `<button class="flaw-card ${escapeHtml(String(issue.severity || "").toLowerCase())}" type="button" data-step="${issue.step ?? state.frameIndex}">
+    <strong>${escapeHtml(detectorLabel(issue.detector))}</strong>
+    <span>${escapeHtml(issue.severity || "P?")} | step ${escapeHtml(String(issue.step ?? "-"))} | slot ${escapeHtml(String(issue.slot ?? "-"))}</span>
+  </button>`).join("");
+  elements.flawSignalPanel.querySelectorAll(".flaw-card").forEach((node) => {
+    node.addEventListener("click", () => setFrame(Number(node.dataset.step || 0)));
+  });
 }
 
 function renderIssues() {
@@ -390,11 +488,24 @@ function renderIssues() {
     return;
   }
   elements.issueList.innerHTML = issues.map((issue) => `<button class="issue-item" type="button" data-step="${issue.step ?? state.frameIndex}">
-    <strong>${escapeHtml(issue.severity || "P?")} ${escapeHtml(issue.detector || "issue")}</strong>
+    <strong>${escapeHtml(issue.severity || "P?")} ${escapeHtml(detectorLabel(issue.detector))}</strong>
     <span>Step ${escapeHtml(String(issue.step ?? "-"))} | Slot ${escapeHtml(String(issue.slot ?? "-"))}</span>
     <div>${escapeHtml(issue.message || "")}</div>
   </button>`).join("");
   elements.issueList.querySelectorAll(".issue-item").forEach((node) => {
+    node.addEventListener("click", () => setFrame(Number(node.dataset.step || 0)));
+  });
+}
+
+function renderTimelineMarkers() {
+  if (!state.replay || !elements.timelineMarkers) return;
+  const maxStep = Math.max(1, state.replay.frames.length - 1);
+  const uniqueSteps = [...new Set((state.replay.issues || []).map((issue) => Number(issue.step)).filter((step) => Number.isFinite(step)))];
+  elements.timelineMarkers.innerHTML = uniqueSteps.map((step) => {
+    const left = Math.max(0, Math.min(100, (step / maxStep) * 100));
+    return `<button class="timeline-marker" type="button" data-step="${step}" style="left:${left}%" aria-label="Jump to issue at step ${step}"></button>`;
+  }).join("");
+  elements.timelineMarkers.querySelectorAll(".timeline-marker").forEach((node) => {
     node.addEventListener("click", () => setFrame(Number(node.dataset.step || 0)));
   });
 }
