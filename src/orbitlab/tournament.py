@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 from kaggle_environments import make
 
 from .adapters import read_field
+from .replay import write_viewer_replay
 
 
 def _winner_slot(rewards: list[int | float | None]) -> int | None:
@@ -50,6 +52,7 @@ def run_match(
     match_id: str | None = None,
     matchup: str = "",
     run_id: str = "",
+    viewer_replay_path: str | Path | None = None,
 ) -> dict[str, Any]:
     start = time.perf_counter()
     match_id = match_id or f"{matchup or 'match'}__seed_{seed}__{'__'.join(str(i) for i in range(len(agents)))}"
@@ -60,7 +63,7 @@ def run_match(
         rewards = [state.reward for state in final]
         statuses = [state.status for state in final]
         winner = _winner_slot(rewards)
-        return {
+        result = {
             "match_id": match_id,
             "run_id": run_id,
             "matchup": matchup,
@@ -76,6 +79,10 @@ def run_match(
             "replay_path": None,
             "error_text": None,
         }
+        if viewer_replay_path is not None:
+            replay_path = write_viewer_replay(viewer_replay_path, result, env)
+            result["replay_path"] = str(replay_path)
+        return result
     except Exception as exc:
         return {
             "match_id": match_id,

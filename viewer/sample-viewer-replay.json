@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "game": "orbit_wars",
+  "match_id": "sample_cherry_lab",
+  "run_id": "viewer_sample",
+  "matchup": "candidate_vs_baseline",
+  "seed": 42,
+  "player_count": 2,
+  "agents": ["candidate", "baseline"],
+  "rewards": [1, -1],
+  "statuses": ["DONE", "DONE"],
+  "winner_slot": 0,
+  "board": { "size": 100, "center": [50, 50], "sun_radius": 10 },
+  "frames": [
+    {
+      "step": 0,
+      "planets": [[0, 0, 18, 25, 2.1, 10, 3], [1, 1, 82, 75, 2.1, 10, 3], [2, -1, 39, 44, 1.7, 18, 4], [3, -1, 61, 56, 1.7, 18, 4]],
+      "fleets": [],
+      "comets": [],
+      "comet_planet_ids": [],
+      "metrics": [
+        { "match_id": "sample_cherry_lab", "step": 0, "slot": 0, "planets": 1, "ships_on_planets": 10, "ships_in_fleets": 0, "total_ships": 10, "production": 3, "fleets": 0 },
+        { "match_id": "sample_cherry_lab", "step": 0, "slot": 1, "planets": 1, "ships_on_planets": 10, "ships_in_fleets": 0, "total_ships": 10, "production": 3, "fleets": 0 }
+      ],
+      "actions": []
+    },
+    {
+      "step": 1,
+      "planets": [[0, 0, 18, 25, 2.1, 13, 3], [1, 1, 82, 75, 2.1, 13, 3], [2, -1, 39, 44, 1.7, 18, 4], [3, -1, 61, 56, 1.7, 18, 4]],
+      "fleets": [[0, 0, 24, 29, 0.52, 0, 6]],
+      "comets": [],
+      "comet_planet_ids": [],
+      "metrics": [
+        { "match_id": "sample_cherry_lab", "step": 1, "slot": 0, "planets": 1, "ships_on_planets": 13, "ships_in_fleets": 6, "total_ships": 19, "production": 3, "fleets": 1 },
+        { "match_id": "sample_cherry_lab", "step": 1, "slot": 1, "planets": 1, "ships_on_planets": 13, "ships_in_fleets": 0, "total_ships": 13, "production": 3, "fleets": 0 }
+      ],
+      "actions": [[[0, 0.52, 6]], []]
+    },
+    {
+      "step": 2,
+      "planets": [[0, 0, 18, 25, 2.1, 16, 3], [1, 1, 82, 75, 2.1, 16, 3], [2, -1, 39, 44, 1.7, 18, 4], [3, -1, 61, 56, 1.7, 18, 4]],
+      "fleets": [[0, 0, 30, 33, 0.52, 0, 6], [1, 1, 76, 71, -2.62, 1, 6]],
+      "comets": [],
+      "comet_planet_ids": [],
+      "metrics": [
+        { "match_id": "sample_cherry_lab", "step": 2, "slot": 0, "planets": 1, "ships_on_planets": 16, "ships_in_fleets": 6, "total_ships": 22, "production": 3, "fleets": 1 },
+        { "match_id": "sample_cherry_lab", "step": 2, "slot": 1, "planets": 1, "ships_on_planets": 16, "ships_in_fleets": 6, "total_ships": 22, "production": 3, "fleets": 1 }
+      ],
+      "actions": [[], [[1, -2.62, 6]]]
+    },
+    {
+      "step": 3,
+      "planets": [[0, 0, 18, 25, 2.1, 19, 3], [1, 1, 82, 75, 2.1, 19, 3], [2, 0, 39, 44, 1.7, 5, 4], [3, -1, 61, 56, 1.7, 18, 4]],
+      "fleets": [[1, 1, 70, 67, -2.62, 1, 6]],
+      "comets": [],
+      "comet_planet_ids": [],
+      "metrics": [
+        { "match_id": "sample_cherry_lab", "step": 3, "slot": 0, "planets": 2, "ships_on_planets": 24, "ships_in_fleets": 0, "total_ships": 24, "production": 7, "fleets": 0 },
+        { "match_id": "sample_cherry_lab", "step": 3, "slot": 1, "planets": 1, "ships_on_planets": 19, "ships_in_fleets": 6, "total_ships": 25, "production": 3, "fleets": 1 }
+      ],
+      "actions": [[], []]
+    }
+  ],
+  "issues": [
+    { "detector": "slow_expansion", "severity": "P2", "message": "Candidate waited too long before second capture.", "match_id": "sample_cherry_lab", "step": 3, "slot": 0, "evidence": { "planets": 1 } }
+  ],
+  "notes": []
+}

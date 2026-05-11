@@ -14,8 +14,16 @@ def main() -> None:
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--agents", nargs="+", required=True)
     parser.add_argument("--matchup", default="manual")
+    parser.add_argument("--replay-out", default=None, help="Optional path for a viewer JSON replay artifact.")
     args = parser.parse_args()
-    result = run_match(seed=args.seed, agents=args.agents, player_count=len(args.agents), debug=True, matchup=args.matchup)
+    result = run_match(
+        seed=args.seed,
+        agents=args.agents,
+        player_count=len(args.agents),
+        debug=True,
+        matchup=args.matchup,
+        viewer_replay_path=args.replay_out,
+    )
     result.pop("turn_metrics", None)
     print(json.dumps(result, indent=2))
 

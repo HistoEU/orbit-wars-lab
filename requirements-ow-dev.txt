@@ -1,1 +1,2 @@
+git+https://github.com/Kaggle/kaggle-environments.git#egg=kaggle-environments
 pytest==8.4.2

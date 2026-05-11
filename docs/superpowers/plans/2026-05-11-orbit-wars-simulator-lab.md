@@ -101,6 +101,12 @@ Primary deliverables:
 - `submissions/<version>/main.py`.
 - A daily submission checklist and a monthly retrospective report.
 
+### Visual Simulator Layer: Replay Review And Observational Notes
+
+Add the visual simulator layer described in `docs/superpowers/plans/2026-05-11-orbit-wars-visual-simulator-layer.md` as a parallel Week 2-4 workstream. The visual layer exports authoritative match state to replay JSON, opens those artifacts in a static browser viewer, and lets us watch the board with synchronized metrics, issue markers, and human observational notes.
+
+This layer is integrated after the authoritative runner is stable because the viewer must display real match state rather than guessed state. It becomes part of the daily submission loop once `tools/run_match.py` can write viewer JSON and `viewer/index.html` can load that file without a server.
+
 ---
 
 ## File Structure

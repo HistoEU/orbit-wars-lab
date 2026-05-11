@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Orbit Wars Visual Lab</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Orbit Wars Visual Lab</h1>
+          <p id="matchSubtitle">Load a replay to inspect orbit control, fleet timing, and match pressure.</p>
+        </div>
+        <div class="top-actions">
+          <label class="file-button">
+            Load JSON
+            <input id="fileInput" type="file" accept="application/json,.json">
+          </label>
+          <button id="sampleButton" type="button">Sample</button>
+          <button id="fitButton" type="button">Fit</button>
+        </div>
+      </header>
+
+      <section class="viewer-grid">
+        <section class="stage-panel" aria-label="Simulation board">
+          <div class="stage-meta">
+            <div>
+              <span class="label">Step</span>
+              <strong id="stepReadout">0 / 0</strong>
+            </div>
+            <div>
+              <span class="label">Phase</span>
+              <strong id="phaseReadout">early</strong>
+            </div>
+            <div>
+              <span class="label">Winner</span>
+              <strong id="winnerReadout">-</strong>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="boardCanvas" width="900" height="900"></canvas>
+          </div>
+          <div class="timeline">
+            <button id="prevButton" type="button">Prev</button>
+            <button id="playButton" type="button">Play</button>
+            <button id="nextButton" type="button">Next</button>
+            <input id="stepSlider" type="range" min="0" max="0" value="0">
+            <select id="speedSelect" aria-label="Playback speed">
+              <option value="160">0.5x</option>
+              <option value="90" selected>1x</option>
+              <option value="45">2x</option>
+              <option value="20">4x</option>
+            </select>
+          </div>
+        </section>
+
+        <aside class="data-panel" aria-label="Simulation analytics">
+          <section class="panel-section">
+            <h2>Match</h2>
+            <dl id="matchSummary" class="summary-list"></dl>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-title-row">
+              <h2>Telemetry</h2>
+              <div class="toggles">
+                <label><input id="labelsToggle" type="checkbox" checked> Labels</label>
+                <label><input id="trailsToggle" type="checkbox" checked> Trails</label>
+              </div>
+            </div>
+            <div id="metricsTable" class="metrics-table"></div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-title-row">
+              <h2>Issues</h2>
+              <button id="nextIssueButton" type="button">Jump</button>
+            </div>
+            <div id="issueList" class="issue-list"></div>
+          </section>
+
+          <section class="panel-section notes-section">
+            <div class="section-title-row">
+              <h2>Notes</h2>
+              <button id="exportNotesButton" type="button">Export</button>
+            </div>
+            <div class="note-controls">
+              <select id="noteCategory">
+                <option value="expansion">Expansion</option>
+                <option value="defense">Defense</option>
+                <option value="comet">Comet</option>
+                <option value="collision">Collision</option>
+                <option value="timing">Timing</option>
+                <option value="scoring">Scoring</option>
+                <option value="other">Other</option>
+              </select>
+              <textarea id="noteText" rows="4" placeholder="Observation at current turn"></textarea>
+              <button id="addNoteButton" type="button">Add Note</button>
+            </div>
+            <div id="noteList" class="note-list"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
