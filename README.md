@@ -47,6 +47,13 @@ Run a direct candidate-vs-baseline comparison with optional replay export:
 .venv-ow\Scripts\python tools\compare_bots.py --candidate bots/our_v1/main.py --baseline bots/starter/main.py --seeds 1 2 3 4 5 --viewer-replays
 ```
 
+Run explicit PvP. Use two agents for 2P or four agents for 4P:
+
+```powershell
+.venv-ow\Scripts\python tools\run_pvp.py --agents bots/our_v1/main.py bots/starter/main.py --seeds 1 2 3 --viewer-replays --focus-agent bots/our_v1/main.py
+.venv-ow\Scripts\python tools\run_pvp.py --agents bots/our_v1/main.py bots/starter/main.py bots/random_hold/main.py bots/random_hold/main.py --player-count 4 --seeds 42 --viewer-replays
+```
+
 ## Visual Viewer
 
 Start a local static server from the repo root:

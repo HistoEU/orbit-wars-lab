@@ -1,0 +1,19 @@
+{
+  "label": "pvp_4p_smoke",
+  "seeds": [42],
+  "workers": 1,
+  "export_viewer_replays": true,
+  "matchups": [
+    {
+      "name": "pvp_4p",
+      "agents": [
+        "bots/our_v1/main.py",
+        "bots/starter/main.py",
+        "bots/random_hold/main.py",
+        "bots/random_hold/main.py"
+      ],
+      "player_count": 4,
+      "rotate_slots": true
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "label": "pvp_2p_viewer_smoke",
+  "seeds": [42],
+  "workers": 1,
+  "export_viewer_replays": true,
+  "matchups": [
+    {
+      "name": "pvp_2p",
+      "agents": ["bots/our_v1/main.py", "bots/starter/main.py"],
+      "player_count": 2,
+      "rotate_slots": true
+    }
+  ]
+}

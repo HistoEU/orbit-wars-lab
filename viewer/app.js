@@ -31,6 +31,7 @@ const elements = {
   addNoteButton: document.getElementById("addNoteButton"),
   noteCategory: document.getElementById("noteCategory"),
   noteText: document.getElementById("noteText"),
+  modeReadout: document.getElementById("modeReadout"),
   stepReadout: document.getElementById("stepReadout"),
   phaseReadout: document.getElementById("phaseReadout"),
   winnerReadout: document.getElementById("winnerReadout"),
@@ -355,6 +356,7 @@ function renderAll() {
     return;
   }
   elements.stepReadout.textContent = `${frameData.step} / ${replay.frames.length - 1}`;
+  elements.modeReadout.textContent = `PvP ${replay.player_count || replay.agents.length}P`;
   elements.phaseReadout.textContent = phaseForStep(frameData.step);
   elements.winnerReadout.textContent = replay.winner_slot === null || replay.winner_slot === undefined ? "-" : ownerName(replay.winner_slot);
   elements.stepSlider.value = state.frameIndex;
