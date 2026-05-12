@@ -137,3 +137,52 @@ def test_agent_returns_legal_move_shape():
     assert all(move[0] == 1 for move in moves)
     assert all(isinstance(move[1], float) for move in moves)
     assert all(isinstance(move[2], int) and move[2] > 0 for move in moves)
+
+
+def test_opening_first_capture_sends_enough_for_cheap_neutral():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 1,
+        "planets": [
+            [1, 0, 10, 10, 3, 10, 5],
+            [2, -1, 24, 10, 2, 8, 4],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves == [[1, 0.0, 9]]
+
+
+def test_stuck_single_planet_keeps_trying_full_cheap_capture_through_step_60():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 45,
+        "planets": [
+            [1, 0, 10, 10, 3, 12, 5],
+            [2, -1, 24, 10, 2, 8, 4],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves == [[1, 0.0, 9]]
+
+
+def test_single_source_does_not_trickle_underpowered_fleet_at_large_neutral():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 5,
+        "planets": [
+            [1, 0, 10, 10, 3, 10, 5],
+            [2, -1, 24, 10, 2, 16, 4],
+        ],
+        "fleets": [],
+    }
+
+    assert bot.agent(obs) == []

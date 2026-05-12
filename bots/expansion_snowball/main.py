@@ -331,7 +331,35 @@ def candidate_targets(state):
     return [p for p in state["targets"] if not (p.is_comet and step < 120)]
 
 
+def opening_first_capture(state):
+    if state.get("step", 0) > 60 or len(state["mine"]) != 1 or not state["neutral"]:
+        return []
+    source = state["mine"][0]
+    if state.get("incoming_by_planet", {}).get(source.id, 0.0) > 0:
+        return []
+    candidates = []
+    for target in state["neutral"]:
+        if target.is_comet:
+            continue
+        ships = int(math.floor(target.ships)) + 1
+        if source.ships < ships + 1:
+            continue
+        route = route_plan(source, target, ships)
+        if route is None:
+            continue
+        angle, turns = route
+        score = target.production * 20.0 - ships - turns * 0.5
+        candidates.append((score, turns, target.id, [source.id, float(angle), ships]))
+    if not candidates:
+        return []
+    candidates.sort(key=lambda item: (-item[0], item[1], item[2]))
+    return [candidates[0][3]]
+
+
 def plan_moves(state):
+    opening = opening_first_capture(state)
+    if opening:
+        return opening
     candidates = []
     targets = candidate_targets(state)
     for source in state["mine"]:
@@ -361,6 +389,8 @@ def plan_moves(state):
             continue
         ships = min(surplus, remaining_need)
         if ships < MIN_LAUNCH:
+            continue
+        if ships < remaining_need:
             continue
         route = route_plan(source, target, ships)
         if route is None:
