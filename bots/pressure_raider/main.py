@@ -218,7 +218,7 @@ def compute_incoming_pressure(state):
 
 def compute_reserve(source, state):
     incoming = state.get("incoming_by_planet", {}).get(source.id, 0.0)
-    base = max(8.0, source.production * 2.0)
+    base = max(5.0, source.production * 1.5)
     if state.get("step", 0) < 45:
         base = max(5.0, source.production)
     return max(base, incoming * 1.25)
@@ -315,7 +315,10 @@ def plan_pressure(state):
 
 def plan_expansion_fallback(state, reserved_sources=None):
     reserved_sources = reserved_sources or {}
-    targets = state.get("neutral", []) or state.get("targets", [])
+    if state.get("step", 0) <= 45:
+        targets = state.get("neutral", []) or state.get("targets", [])
+    else:
+        targets = list(state.get("neutral", [])) + list(state.get("enemies", []))
     proposals = []
     for source in state.get("mine", []):
         reserve = compute_reserve(source, state)
@@ -342,6 +345,8 @@ def plan_expansion_fallback(state, reserved_sources=None):
         ships = min(surplus, remaining)
         if ships <= 0:
             continue
+        if ships < remaining:
+            continue
         route = plan_route(source, target, ships)
         if route is None:
             continue
@@ -351,7 +356,34 @@ def plan_expansion_fallback(state, reserved_sources=None):
     return moves
 
 
+def opening_first_capture(state):
+    if state.get("step", 0) > 60 or len(state.get("mine", [])) != 1 or not state.get("neutral", []):
+        return []
+    source = state["mine"][0]
+    if state.get("incoming_by_planet", {}).get(source.id, 0.0) > 0:
+        return []
+    candidates = []
+    for target in state["neutral"]:
+        if target.is_comet:
+            continue
+        ships = int(math.floor(target.ships)) + 1
+        if source.ships < ships + 1:
+            continue
+        route = plan_route(source, target, ships)
+        if route is None:
+            continue
+        score = target.production * 20.0 - ships - route["travel_turns"] * 0.5
+        candidates.append((score, route["travel_turns"], target.id, [source.id, float(route["angle"]), ships]))
+    if not candidates:
+        return []
+    candidates.sort(key=lambda item: (-item[0], item[1], item[2]))
+    return [candidates[0][3]]
+
+
 def plan_moves(state):
+    opening = opening_first_capture(state)
+    if opening:
+        return opening
     pressure = plan_pressure(state)
     reserved = {}
     for source_id, _angle, ships in pressure:

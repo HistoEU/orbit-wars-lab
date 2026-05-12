@@ -195,9 +195,11 @@ def choose_mode_budget(signals):
             return {"EXPAND": 60, "DEFEND": 15, "COMET": 10, "PRESSURE": 10, "ENDGAME_SCORE": 5}
         return {"EXPAND": 65, "DEFEND": 20, "COMET": 10, "PRESSURE": 5, "ENDGAME_SCORE": 0}
     if phase == "mid":
-        if ship_delta < -20:
-            return {"PRESSURE": 35, "EXPAND": 30, "COMET": 20, "DEFEND": 15, "ENDGAME_SCORE": 0}
-        return {"EXPAND": 30, "DEFEND": 25, "PRESSURE": 25, "COMET": 20, "ENDGAME_SCORE": 0}
+        if signals.get("production_delta", 0) < -8 or signals.get("planet_delta", 0) < -1:
+            return {"EXPAND": 55, "PRESSURE": 25, "COMET": 10, "DEFEND": 10, "ENDGAME_SCORE": 0}
+        if ship_delta < -40:
+            return {"EXPAND": 40, "PRESSURE": 30, "COMET": 15, "DEFEND": 15, "ENDGAME_SCORE": 0}
+        return {"EXPAND": 45, "PRESSURE": 35, "DEFEND": 10, "COMET": 10, "ENDGAME_SCORE": 0}
     if phase == "late":
         if ship_delta < -20:
             return {"PRESSURE": 55, "ENDGAME_SCORE": 25, "COMET": 10, "DEFEND": 10, "EXPAND": 0}
@@ -332,9 +334,9 @@ def add_proposal(proposals, planner, source, target, ships, route, score, reason
 
 def plan_expansion(state, signals):
     proposals = []
-    targets = state["neutral_planets"]
-    if not targets and signals["phase"] != "early":
-        targets = state["enemy_planets"]
+    targets = list(state["neutral_planets"])
+    if signals["phase"] != "early":
+        targets.extend(state["enemy_planets"])
     for source in state["my_planets"]:
         for target in targets:
             rough = max(1, int(target.ships + max(2, target.production * 1.5)))
@@ -445,8 +447,349 @@ def scale_budgets_to_ships(budgets, ledger):
     return {name: max(0.0, total_available * value / 100.0) for name, value in budgets.items()}
 
 
-def plan_moves(state):
+def economy_compute_reserve(source, state):
+    incoming = state.get("incoming_by_planet", {}).get(source.id, 0.0)
+    if state.get("step", 0) < 45 and incoming <= 0:
+        base = max(5.0, float(source.production))
+    else:
+        base = max(5.0, source.production * 1.5)
+    if state.get("step", 0) >= 300:
+        base = max(base, source.production * 2.0)
+    return max(base, incoming * 1.25)
+
+
+def economy_phase_payback_limit(step):
+    if step <= 45:
+        return 45.0
+    if step <= 260:
+        return 35.0
+    if step <= 420:
+        return 20.0
+    return 8.0
+
+
+def economy_targets(state):
+    step = state.get("step", 0)
+    if step <= 45:
+        neutrals = [p for p in state["neutral_planets"] if not p.is_comet]
+        return neutrals if neutrals else [p for p in state["planets"] if p.owner != state["player"]]
+    return [
+        p
+        for p in state["planets"]
+        if p.owner != state["player"] and not (p.is_comet and step < 120)
+    ]
+
+
+def economy_cluster_value(target, state):
+    value = 0.0
+    for planet in state["neutral_planets"] + state["enemy_planets"]:
+        if planet.id == target.id:
+            continue
+        if dist_xy(target.x, target.y, planet.x, planet.y) <= 22.0:
+            value += min(2.0, max(0, planet.production) * 0.4)
+    return value
+
+
+def economy_forward_base_value(source, target, state):
+    if not state["enemy_planets"]:
+        return 0.0
+    nearest_enemy_dist = min(distance(target, enemy) for enemy in state["enemy_planets"])
+    source_enemy_dist = min(distance(source, enemy) for enemy in state["enemy_planets"])
+    if nearest_enemy_dist >= source_enemy_dist:
+        return 0.0
+    return min(8.0, (source_enemy_dist - nearest_enemy_dist) / 10.0)
+
+
+def economy_contest_risk(target, state):
+    if not state["enemy_planets"]:
+        return 0.0
+    enemy_dist = min(dist_xy(target.x, target.y, enemy.x, enemy.y) for enemy in state["enemy_planets"])
+    mine_dist = min(dist_xy(target.x, target.y, mine.x, mine.y) for mine in state["my_planets"])
+    if enemy_dist >= mine_dist:
+        return 0.0
+    return min(20.0, (mine_dist - enemy_dist) / 5.0)
+
+
+def economy_overextend_penalty(target, state):
+    if state.get("player_count", 2) <= 2:
+        return 0.0
+    nearby_enemy_groups = sum(
+        1 for enemy in state["enemy_planets"] if dist_xy(target.x, target.y, enemy.x, enemy.y) <= 30.0
+    )
+    return max(0, nearby_enemy_groups - 1) * 4.0
+
+
+def economy_score_target(source, target, state):
+    rough = max(1, int(target.ships + max(2.0, target.production * 1.5)))
+    rough_route = plan_route(source, target, rough)
+    if rough_route is None:
+        return None
+    ships_required = capture_ships(target, rough_route["travel_turns"])
+    route = plan_route(source, target, ships_required)
+    if route is None:
+        return None
+    production = max(0, target.production)
+    payback = ships_required / max(1.0, float(production))
+    payback_penalty = max(0.0, payback - economy_phase_payback_limit(state.get("step", 0))) * 2.0
+    denial = 5.0 if target.owner >= 0 else 0.0
+    score = (
+        production * 14.0
+        + economy_cluster_value(target, state) * 4.0
+        + economy_forward_base_value(source, target, state) * 2.5
+        + denial
+        - ships_required
+        - route["travel_turns"] * 0.7
+        - economy_contest_risk(target, state) * 2.0
+        - economy_overextend_penalty(target, state) * 3.0
+        - payback_penalty
+    )
+    return {"score": score, "ships_required": ships_required, "route": route}
+
+
+def economy_plan_moves(state):
+    opening = opening_first_capture(state)
+    if opening:
+        return opening
+    candidates = []
+    for source in state["my_planets"]:
+        reserve = economy_compute_reserve(source, state)
+        if source.ships - reserve < 1:
+            continue
+        for target in economy_targets(state):
+            scored = economy_score_target(source, target, state)
+            if scored is None or scored["score"] <= -20.0:
+                continue
+            candidates.append((scored, source, target))
+    candidates.sort(key=lambda item: (-item[0]["score"], item[0]["route"]["travel_turns"], item[2].id, item[1].id))
+
+    source_spent = {}
+    target_planned = {}
+    target_need = {}
+    moves = []
+    for scored, source, target in candidates:
+        reserve = economy_compute_reserve(source, state)
+        surplus = int(math.floor(source.ships - reserve - source_spent.get(source.id, 0)))
+        if surplus < 1:
+            continue
+        need = target_need.setdefault(target.id, scored["ships_required"])
+        remaining_need = int(math.ceil(need - target_planned.get(target.id, 0)))
+        if remaining_need < 1:
+            continue
+        ships = min(surplus, remaining_need)
+        if ships < remaining_need:
+            continue
+        route = plan_route(source, target, ships)
+        if route is None:
+            continue
+        source_spent[source.id] = source_spent.get(source.id, 0) + ships
+        target_planned[target.id] = target_planned.get(target.id, 0) + ships
+        moves.append([source.id, float(route["angle"]), int(ships)])
+    return moves
+
+
+def pressure_champion_reserve(source, state):
+    incoming = state.get("incoming_by_planet", {}).get(source.id, 0.0)
+    base = max(5.0, source.production * 1.5)
+    if state.get("step", 0) < 45:
+        base = max(5.0, source.production)
+    return max(base, incoming * 1.25)
+
+
+def pressure_champion_budget_fraction(state):
+    step = int(state.get("step", 0))
+    ship_delta = float(compute_signals(state).get("ship_delta", 0.0))
+    if step < 90:
+        return 0.15 if ship_delta < -20 else 0.08
+    if step < 300:
+        return 0.50 if ship_delta < -20 else 0.45
+    return 0.60 if ship_delta < -20 else 0.25
+
+
+def pressure_champion_threshold(state):
+    step = state.get("step", 0)
+    ship_delta = float(compute_signals(state).get("ship_delta", 0.0))
+    if step < 90:
+        return 35.0
+    if step >= 300 and ship_delta < -20:
+        return 5.0
+    if ship_delta > 30:
+        return 18.0
+    return 12.0
+
+
+def pressure_champion_score(source, target, state):
+    rough = max(1, int(target.ships + max(2, target.production * 1.5)))
+    route = plan_route(source, target, rough)
+    if route is None:
+        return {"score": -9999.0, "ships": 0, "route": None}
+    ships = capture_ships(target, route["travel_turns"])
+    route = plan_route(source, target, ships)
+    if route is None:
+        return {"score": -9999.0, "ships": ships, "route": None}
     signals = compute_signals(state)
+    home_bonus = 20.0 if target.production >= 5 and target.ships <= 20 else 0.0
+    late_score = max(0.0, -signals.get("ship_delta", 0.0)) * 0.2 if state.get("step", 0) >= 300 else 0.0
+    counter_risk = max(0.0, ships - max(0.0, source.ships - pressure_champion_reserve(source, state)))
+    score = (
+        target.production * 12.0
+        + target.ships * 0.8
+        + home_bonus
+        + late_score * 1.5
+        - ships
+        - route["travel_turns"]
+        - route["risk"] * 3.0
+        - counter_risk * 2.5
+    )
+    return {"score": score, "ships": ships, "route": route}
+
+
+def pressure_champion_attacks(state):
+    proposals = []
+    budget_fraction = pressure_champion_budget_fraction(state)
+    for source in state.get("my_planets", []):
+        reserve = pressure_champion_reserve(source, state)
+        surplus = int(math.floor(source.ships - reserve))
+        budget = int(math.floor(surplus * budget_fraction))
+        if budget <= 0:
+            continue
+        for target in state.get("enemy_planets", []):
+            scored = pressure_champion_score(source, target, state)
+            if scored["score"] >= pressure_champion_threshold(state):
+                proposals.append((scored["score"], source, target, scored, budget))
+    proposals.sort(key=lambda item: (-item[0], item[3]["route"]["travel_turns"], item[2].id))
+    moves = []
+    source_spent = {}
+    target_planned = {}
+    for _score, source, target, scored, budget in proposals:
+        reserve = pressure_champion_reserve(source, state)
+        surplus = int(math.floor(source.ships - reserve - source_spent.get(source.id, 0)))
+        remaining_budget = budget - source_spent.get(source.id, 0)
+        remaining_need = scored["ships"] - target_planned.get(target.id, 0)
+        ships = min(surplus, remaining_budget, remaining_need)
+        if ships <= 0 or ships < scored["ships"]:
+            continue
+        route = plan_route(source, target, ships)
+        if route is None:
+            continue
+        source_spent[source.id] = source_spent.get(source.id, 0) + ships
+        target_planned[target.id] = target_planned.get(target.id, 0) + ships
+        moves.append([source.id, float(route["angle"]), int(ships)])
+    return moves
+
+
+def pressure_champion_expansion(state, reserved_sources=None):
+    reserved_sources = reserved_sources or {}
+    if state.get("step", 0) <= 45:
+        targets = list(state.get("neutral_planets", [])) or [p for p in state["planets"] if p.owner != state["player"]]
+    else:
+        targets = list(state.get("neutral_planets", [])) + list(state.get("enemy_planets", []))
+    proposals = []
+    for source in state.get("my_planets", []):
+        reserve = pressure_champion_reserve(source, state)
+        surplus = int(math.floor(source.ships - reserve - reserved_sources.get(source.id, 0)))
+        if surplus <= 0:
+            continue
+        for target in targets:
+            if target.is_comet:
+                continue
+            rough = max(1, int(target.ships + max(2, target.production * 1.5)))
+            route = plan_route(source, target, rough)
+            if route is None:
+                continue
+            ships = capture_ships(target, route["travel_turns"])
+            score = target.production * 12.0 - ships - route["travel_turns"] * 0.8
+            if score > -10:
+                proposals.append((score, source, target, ships, route))
+    proposals.sort(key=lambda item: (-item[0], item[4]["travel_turns"], item[2].id))
+    moves = []
+    source_spent = dict(reserved_sources)
+    target_planned = {}
+    for _score, source, target, ships_needed, _route in proposals:
+        reserve = pressure_champion_reserve(source, state)
+        surplus = int(math.floor(source.ships - reserve - source_spent.get(source.id, 0)))
+        remaining = ships_needed - target_planned.get(target.id, 0)
+        ships = min(surplus, remaining)
+        if ships <= 0 or ships < remaining:
+            continue
+        route = plan_route(source, target, ships)
+        if route is None:
+            continue
+        source_spent[source.id] = source_spent.get(source.id, 0) + ships
+        target_planned[target.id] = target_planned.get(target.id, 0) + ships
+        moves.append([source.id, float(route["angle"]), int(ships)])
+    return moves
+
+
+def pressure_champion_moves(state):
+    opening = opening_first_capture(state)
+    if opening:
+        return opening
+    pressure = pressure_champion_attacks(state)
+    reserved = {}
+    for source_id, _angle, ships in pressure:
+        reserved[source_id] = reserved.get(source_id, 0) + ships
+    return pressure + pressure_champion_expansion(state, reserved)
+
+
+def economy_guard_moves(state, signals, ledger, proposals):
+    if signals["phase"] not in {"early", "mid"}:
+        return []
+    if signals.get("player_count", 2) > 2 or signals.get("incoming_threat", 0) > 0:
+        return []
+    neutral_ids = {target.id for target in state["neutral_planets"] if not target.is_comet}
+    expansion_proposals = [
+        proposal
+        for proposal in proposals
+        if proposal.get("planner") == "EXPAND" and int(proposal.get("target_id", -1)) in neutral_ids
+    ]
+    if not expansion_proposals:
+        return []
+    guard_ledger = {source_id: dict(source) for source_id, source in ledger.items()}
+    guard_budget = {"EXPAND": sum(source["available"] for source in guard_ledger.values())}
+    return merge_proposals(expansion_proposals, guard_ledger, guard_budget)
+
+
+def opening_first_capture(state):
+    if state.get("step", 0) > 60 or len(state["my_planets"]) != 1 or not state["neutral_planets"]:
+        return []
+    source = state["my_planets"][0]
+    if state.get("incoming_by_planet", {}).get(source.id, 0.0) > 0:
+        return []
+    candidates = []
+    for target in state["neutral_planets"]:
+        if target.is_comet:
+            continue
+        ships = int(math.floor(target.ships)) + 1
+        if source.ships < ships + 1:
+            continue
+        route = plan_route(source, target, ships)
+        if route is None:
+            continue
+        score = target.production * 20.0 - ships - route["travel_turns"] * 0.5
+        candidates.append((score, route["travel_turns"], target.id, [source.id, float(route["angle"]), ships]))
+    if not candidates:
+        return []
+    candidates.sort(key=lambda item: (-item[0], item[1], item[2]))
+    return [candidates[0][3]]
+
+
+def plan_moves(state):
+    opening = opening_first_capture(state)
+    if opening:
+        return opening
+    signals = compute_signals(state)
+    if signals.get("player_count", 2) <= 2:
+        champion = pressure_champion_moves(state)
+        if champion:
+            return champion
+    economy_moves = economy_plan_moves(state)
+    if (
+        economy_moves
+        and signals["phase"] == "early"
+        and signals.get("player_count", 2) <= 2
+        and signals.get("incoming_threat", 0) <= 0
+    ):
+        return economy_moves
     reserves = compute_reserves(state, signals)
     ledger = build_source_ledger(state["my_planets"], reserves)
     budgets = scale_budgets_to_ships(choose_mode_budget(signals), ledger)
@@ -455,6 +798,9 @@ def plan_moves(state):
     proposals.extend(plan_comets(state, signals))
     proposals.extend(plan_pressure(state, signals))
     proposals.extend(plan_endgame_score(state, signals))
+    guarded = economy_guard_moves(state, signals, ledger, proposals)
+    if guarded:
+        return guarded
     return merge_proposals(proposals, ledger, budgets)
 
 

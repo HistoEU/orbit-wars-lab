@@ -77,3 +77,68 @@ def test_plan_pressure_launches_at_weak_enemy_planet():
     assert moves
     assert moves[0][0] == 1
     assert moves[0][2] >= 14
+
+
+def test_opening_first_capture_sends_enough_for_cheap_neutral():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 1,
+        "planets": [
+            [1, 0, 10, 10, 3, 10, 5],
+            [2, -1, 24, 10, 2, 8, 4],
+            [3, 1, 80, 80, 3, 60, 5],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves[0] == [1, 0.0, 9]
+
+
+def test_expansion_fallback_does_not_trickle_underpowered_fleet():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 20,
+        "planets": [
+            [1, 0, 10, 10, 3, 10, 5],
+            [2, -1, 24, 10, 2, 16, 4],
+            [3, 1, 80, 80, 3, 60, 5],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves == []
+
+
+def test_midgame_unthreatened_reserve_leaves_surplus_active():
+    bot = load_bot()
+    source = bot.PlanetView(1, 0, 20, 20, 3, 50, 5)
+    state = {"step": 160, "player": 0, "mine": [source], "fleets": [], "incoming_by_planet": {1: 0}}
+
+    reserve = bot.compute_reserve(source, state)
+
+    assert reserve <= 8
+
+
+def test_expansion_fallback_can_convert_weak_enemy_after_opening():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 140,
+        "planets": [
+            [1, 0, 10, 10, 3, 200, 5],
+            [2, -1, 24, 10, 2, 8, 1],
+            [3, 1, 10, 24, 2, 6, 6],
+        ],
+        "fleets": [],
+    }
+    state = bot.parse_state(obs)
+
+    moves = bot.plan_expansion_fallback(state)
+
+    assert moves[0][1] == math.pi / 2

@@ -78,3 +78,151 @@ def test_agent_returns_legal_move_shape():
     assert all(len(move) == 3 for move in moves)
     assert all(isinstance(move[1], float) for move in moves)
     assert all(isinstance(move[2], int) and move[2] > 0 for move in moves)
+
+
+def test_opening_first_capture_sends_enough_for_cheap_neutral():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 1,
+        "planets": [
+            [1, 0, 10, 10, 3, 10, 5],
+            [2, -1, 24, 10, 2, 8, 4],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves == [[1, 0.0, 9]]
+
+
+def test_stuck_single_planet_keeps_trying_full_cheap_capture_through_step_60():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 45,
+        "planets": [
+            [1, 0, 10, 10, 3, 12, 5],
+            [2, -1, 24, 10, 2, 8, 4],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves == [[1, 0.0, 9]]
+
+
+def test_midgame_safe_neutrals_are_not_starved_by_pressure_budget():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 140,
+        "planets": [
+            [1, 0, 10, 10, 3, 50, 5],
+            [2, 0, 10, 30, 3, 50, 5],
+            [3, -1, 22, 10, 2, 20, 4],
+            [4, -1, 22, 30, 2, 20, 4],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert len(moves) >= 2
+    assert sum(move[2] for move in moves) >= 52
+
+
+def test_pressure_champion_path_can_punish_exposed_enemy_before_expansion():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 80,
+        "planets": [
+            [1, 0, 10, 10, 3, 500, 5],
+            [2, -1, 24, 10, 2, 8, 5],
+            [3, 1, 10, 24, 2, 10, 5],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves[0][1] == 3.141592653589793 / 2
+
+
+def test_midgame_expansion_generator_can_target_weak_enemy_production():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 140,
+        "planets": [
+            [1, 0, 10, 10, 3, 120, 5],
+            [2, -1, 24, 10, 2, 8, 2],
+            [3, 1, 10, 24, 2, 6, 6],
+        ],
+        "fleets": [],
+    }
+    state = bot.compute_game_state(obs)
+    signals = bot.compute_signals(state)
+
+    proposals = bot.plan_expansion(state, signals)
+
+    assert any(proposal["target_id"] == 3 for proposal in proposals)
+
+
+def test_economy_plan_moves_available_for_champion_guard():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 140,
+        "planets": [
+            [1, 0, 10, 10, 3, 500, 5],
+            [2, -1, 24, 10, 2, 8, 5],
+            [3, 1, 10, 24, 2, 10, 5],
+        ],
+        "fleets": [],
+    }
+    state = bot.compute_game_state(obs)
+
+    moves = bot.economy_plan_moves(state)
+
+    assert moves[0] == [1, 0.0, 16]
+
+
+def test_late_mode_controller_can_pressure_instead_of_static_economy_guard():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 320,
+        "planets": [
+            [1, 0, 10, 10, 3, 500, 5],
+            [2, -1, 24, 10, 2, 8, 5],
+            [3, 1, 10, 24, 2, 10, 5],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves[0][1] == 3.141592653589793 / 2
+
+
+def test_late_behind_pressure_overrides_economy_guard():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 320,
+        "planets": [
+            [1, 0, 10, 10, 3, 120, 5],
+            [2, -1, 24, 10, 2, 8, 4],
+            [3, 1, 10, 24, 2, 6, 6],
+            [4, 1, 80, 80, 3, 220, 5],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves[0][1] == 3.141592653589793 / 2

@@ -81,3 +81,37 @@ def test_agent_avoids_obvious_sun_death_launch():
     moves = bot.agent(obs)
 
     assert moves == []
+
+
+def test_opening_first_capture_sends_enough_for_cheap_neutral():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 1,
+        "planets": [
+            [1, 0, 10, 10, 3, 10, 5],
+            [2, -1, 24, 10, 2, 8, 4],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves[0] == [1, 0.0, 9]
+
+
+def test_single_source_does_not_trickle_underpowered_safe_route():
+    bot = load_bot()
+    obs = {
+        "player": 0,
+        "step": 20,
+        "planets": [
+            [1, 0, 10, 10, 3, 10, 5],
+            [2, -1, 24, 10, 2, 16, 4],
+        ],
+        "fleets": [],
+    }
+
+    moves = bot.agent(obs)
+
+    assert moves == []

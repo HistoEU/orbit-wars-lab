@@ -238,7 +238,7 @@ def plan_route(source, target, ships):
 def compute_reserve(source, state):
     if state.get("step", 0) < 45:
         return max(5.0, source.production)
-    return max(8.0, source.production * 1.75)
+    return max(5.0, source.production * 1.5)
 
 
 def capture_ships(target, travel_turns):
@@ -299,13 +299,13 @@ def score_comet_candidate(source, comet, state, meta):
 
 def phase_comet_budget_fraction(step):
     if step < 60:
-        return 0.30
+        return 0.20
     if step < 300:
-        return 0.50
+        return 0.35
     return 0.25
 
 
-def plan_comet_launches(state):
+def plan_comet_launches(state, min_score=0.0):
     meta = state.get("comet_meta", {})
     proposals = []
     for source in state["mine"]:
@@ -318,7 +318,7 @@ def plan_comet_launches(state):
             if comet.owner == state["player"]:
                 continue
             scored = score_comet_candidate(source, comet, state, meta)
-            if scored["score"] <= 0:
+            if scored["score"] <= max(0.0, min_score):
                 continue
             proposals.append((scored["score"], source, comet, scored, budget))
     proposals.sort(key=lambda item: (-item[0], item[3]["route"]["travel_turns"], item[2].id))
@@ -342,9 +342,36 @@ def plan_comet_launches(state):
     return moves
 
 
+def best_expansion_candidate_score(state):
+    if state.get("step", 0) <= 45:
+        targets = [p for p in state["neutral"] if not p.is_comet] or [p for p in state["targets"] if not p.is_comet]
+    else:
+        targets = [p for p in state["neutral"] if not p.is_comet] + [p for p in state["enemies"] if not p.is_comet]
+    best = None
+    for source in state["mine"]:
+        reserve = compute_reserve(source, state)
+        if source.ships - reserve <= 0:
+            continue
+        for target in targets:
+            rough = max(1, int(target.ships + max(2, target.production * 1.5)))
+            route = plan_route(source, target, rough)
+            if route is None:
+                continue
+            ships = capture_ships(target, route["travel_turns"])
+            if source.ships - reserve < ships:
+                continue
+            score = target.production * 12.0 - ships - route["travel_turns"] * 0.8
+            if best is None or score > best:
+                best = score
+    return best if best is not None else -9999.0
+
+
 def plan_expansion_fallback(state, reserved_sources=None):
     reserved_sources = reserved_sources or {}
-    targets = [p for p in state["neutral"] if not p.is_comet] or [p for p in state["targets"] if not p.is_comet]
+    if state.get("step", 0) <= 45:
+        targets = [p for p in state["neutral"] if not p.is_comet] or [p for p in state["targets"] if not p.is_comet]
+    else:
+        targets = [p for p in state["neutral"] if not p.is_comet] + [p for p in state["enemies"] if not p.is_comet]
     proposals = []
     for source in state["mine"]:
         reserve = compute_reserve(source, state)
@@ -371,6 +398,8 @@ def plan_expansion_fallback(state, reserved_sources=None):
         ships = min(surplus, remaining)
         if ships <= 0:
             continue
+        if ships < remaining:
+            continue
         final = plan_route(source, target, ships)
         if final is None:
             continue
@@ -380,8 +409,33 @@ def plan_expansion_fallback(state, reserved_sources=None):
     return moves
 
 
+def opening_first_capture(state):
+    if state.get("step", 0) > 60 or len(state.get("mine", [])) != 1 or not state.get("neutral", []):
+        return []
+    source = state["mine"][0]
+    candidates = []
+    for target in state["neutral"]:
+        if target.is_comet:
+            continue
+        ships = int(math.floor(target.ships)) + 1
+        if source.ships < ships + 1:
+            continue
+        route = plan_route(source, target, ships)
+        if route is None:
+            continue
+        score = target.production * 20.0 - ships - route["travel_turns"] * 0.5
+        candidates.append((score, route["travel_turns"], target.id, [source.id, float(route["angle"]), ships]))
+    if not candidates:
+        return []
+    candidates.sort(key=lambda item: (-item[0], item[1], item[2]))
+    return [candidates[0][3]]
+
+
 def plan_moves(state):
-    comet_moves = plan_comet_launches(state)
+    opening = opening_first_capture(state)
+    if opening:
+        return opening
+    comet_moves = plan_comet_launches(state, min_score=best_expansion_candidate_score(state))
     reserved = {}
     for source_id, _angle, ships in comet_moves:
         reserved[source_id] = reserved.get(source_id, 0) + ships
